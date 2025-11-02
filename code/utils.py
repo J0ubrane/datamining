@@ -178,32 +178,35 @@ def gridSearchDBScan(X_reduced, eps_to_test, min_samples_to_test) :
 
 
 
-def cluster_summary(cluster_final, list_disease) :
+def cluster_summary(cluster_final, df) :
 
-    df_analysis = pd.DataFrame({
-        'Cluster_Label': cluster_final,
-        'HeartDisease': list_disease
-    })
+        # Suppose :
+        # - df_encoded contient toutes les données initiales (y compris la colonne 'HeartDisease')
+        # - clusters contient les labels de ton clustering (ex : clusters_manifold, clusters_tsne, etc.)
 
-    # 2. Calcul des Statistiques par Cluster
-    cluster_summary = df_analysis.groupby('Cluster_Label')['HeartDisease'].agg(
-        # Compte le nombre total de points dans le cluster
-        Total_Points='count',
-        # Compte le nombre de patients avec HeartDisease (HeartDisease = 1)
-        Nb_Malades='sum',
-        # Calcule le taux de HeartDisease (Moyenne = Taux pour 0/1)
-        Taux_Maladie='mean'
-    )
+        df_cluster = df.copy()
+        df_cluster['Cluster'] = cluster_final  # ajoute les labels des clusters
 
-    # 3. Formatage et Affichage
-    cluster_summary['Taux_Maladie'] = (cluster_summary['Taux_Maladie'] * 100).round(2).astype(str) + '%'
+        print(f"taille df_cluster : {df_cluster.shape}")
 
-    print(cluster_summary)
+        # Regrouper par cluster et compter les malades / total
+        cluster_stats = (
+            df_cluster.groupby('Cluster')
+            .agg(
+                Total_Points=('HeartDisease', 'count'),
+                Nb_Malades=('HeartDisease', 'sum')
+            )
+        )
 
-    # Interprétation Rapide du Bruit (-1)
-    noise_row = cluster_summary.loc[-1] if -1 in cluster_summary.index else None
-    if noise_row is not None:
-        print(f"Interprétation du Bruit (-1) : {noise_row['Nb_Malades']} patients ({noise_row['Taux_Maladie']}) parmi les points de bruit sont malades.")
+        # Calcul du taux de malades (%)
+        cluster_stats['Taux_Maladie'] = (cluster_stats['Nb_Malades'] / cluster_stats['Total_Points']) * 100
+
+        # Mise en forme
+        cluster_stats = cluster_stats.sort_index()
+        cluster_stats['Taux_Maladie'] = cluster_stats['Taux_Maladie'].map("{:.2f}%".format)
+
+        # Afficher le tableau final
+        print(cluster_stats)
 
 
 def dbscanOnTSNE(X_tsne, eps, min_samples) :
